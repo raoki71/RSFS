@@ -6,7 +6,8 @@
 ## RSFS (Rediculously Simple File System)
 
 
-Before reading ahead there is one minor issue worth mentioning.
+Before reading ahead, please note that there is _one minor issue_ worth mentioning.
+
 When RSFS_write() first tries to write upto ENTIRE inode data blocks (i.e. NUM_POINTERS*BLOCK_SIZE), it writes to the 
     data_blocks[...] correctly. However, when it tries to update inode->length (api.c file), the behavior changes abruptly. I commented out the
     code in line 302 (api.c file). Also, please read the RSFS_write() documentation.
