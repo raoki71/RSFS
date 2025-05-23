@@ -65,7 +65,7 @@ Deletion of data contents in data_blocks.
     Also the inode->block[i] is set to -1.
     
 
-#### Open file function:
+#### (1) Open file function:
 
     line:196-235 RSFS_open(char file_name, int access_flag)
     
@@ -82,7 +82,7 @@ Return the fd $\geq$ 0.
 I used semaphore library to impelement read-write lock, read count, and mutex.
 If the access flag is RDWR, the open is exclusive to a single RDWR thread, so sem_wait() to decreament semaphore value. If the access flag is RDONLY, while incrementing the read count with mutex lock, it checks the read count so that the calling thread needs to wait util RDWR is done.
 
-#### Append function:
+#### (2) Append function:
 
     line:241-335 RSFS_append(int fd, void *buf, int size)
 
@@ -98,13 +98,13 @@ The quotient obtained from above will be the index last of the inode block which
     
 Return the number of bytes appeneded to the file. 
 
-#### Fseek function:
+#### (3) Fseek function:
     line: 342-371 RSFS_fseek(int fd, int offset)
     
 Given a fd and offset value, update the current position of the file in the open file table. The range of offset is from $0$ to inode length. 
 If the given offset is out of range, simply return current position without updating anything.
 
-#### Read function:
+#### (4) Read function:
     line: 375-453 RSFS_read(int fd, void *buf, int size) (line:341-421)
     
 Given a file descriptor, inode, the read will start from the current_position on the open file. 
@@ -140,7 +140,7 @@ Finally, update the current position in the open file entry according to the num
 
 Return the number of bytes read.
 
-#### Close function:
+#### (5) Close function:
     
     line: 457-488 RSFS_close(int fd)
 
@@ -151,7 +151,7 @@ Given the valid fd, call the system call free_open_file_entry to free an open fi
 #### <ins> Concurrent Case for close() </ins>
 If the access flag is RDWR, the close is exclusive to a single RDWR thread, so sem_post() to signal a thread to wake up if there is any. If the access flag is RDONLY, while decrementing the read count with mutex lock, it wakes up a thread if the count is $0$. Then finally close the file.
 
-#### Write function:
+#### (6) Write function:
 
     line: 493-596 RSFS_write(int fd, void *buf, int size)
     
@@ -159,7 +159,7 @@ Write function utilizes the similar operation of RSFS_append(). It first writes 
 
 Return the number of bytes written.
 
-#### Debug functions:
+#### (*) Debug functions:
 - Print out all data blocks (0 ... NUM_DBLOCKS)
 
         line: 599-604 RSFS_print_data_blocks()
