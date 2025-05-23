@@ -1,9 +1,7 @@
 
 @author -   Rei Aoki
 
-#Project 2
-
-## Spring 2025 ComS 352 Project 2##
+# Spring 2025 ComS 352 Project 2
 
 
 ###
