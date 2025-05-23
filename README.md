@@ -3,14 +3,16 @@
 
 # Spring 2025 ComS 352 Project 2
 
+## RSFS (Rediculously Simple File System)
 
-###
-    Before reading ahead there is one minor issue which might not be tested but it is worth mentioning.
-    When RSFS_write() first tries to write upto ENTIRE inode data blocks (i.e. NUM_POINTERS*BLOCK_SIZE), it writes to the 
-    data_blocks[...] correctly. However, when I try to update inode->length (api.c file), the behavior changes abruptly. I commented out the
+
+Before reading ahead there is one minor issue worth mentioning.
+When RSFS_write() first tries to write upto ENTIRE inode data blocks (i.e. NUM_POINTERS*BLOCK_SIZE), it writes to the 
+    data_blocks[...] correctly. However, when it tries to update inode->length (api.c file), the behavior changes abruptly. I commented out the
     code in line 302 (api.c file). Also, please read the RSFS_write() documentation.
 
-    Debug Guilde - [test_advanced_write] test to write 253 character: ...
+    Debug Guide - [test_advanced_write] test to write 253 character: ...
+    
     Uncomment   
             File apic.c - 
                     line:302 inode->length += size      //HERE IS THE CODE ...
@@ -19,60 +21,70 @@
                     line:242 RSFS_write(fd[i], newText, 253)
                     line:250 RSFS_print_inode_data_blocks()
     
-    To see the behavior of data blocks, please use the debug function, RSFS_print_inode_data_blocks() which is also commented out in application.c
-    after RSFS_stat().
+To see the behavior of data blocks, please use the debug function, RSFS_print_inode_data_blocks() which is also commented out in application.c after RSFS_stat().
+    
+    RSFS_fseek(fd, 3)
+    RSFS_write(fd, newText, 252) <---  works fine 
+                                        since 3 + 252 < NUM_POINTERS*BLOCK_SIZE
+    However, after  
 
-        after  RSFS_fseek(fd, 3)
-               RSFS_write(fd, newText, 252) <--- works fine since 3 + 252 < NUM_POINTERS*BLOCK_SIZE
-    However,
-        after  RSFS_fseek(fd, 3)
-               write(fd, newText, 253) <--- RSFS_print_inode_data_blocks() outputs some black datalocks from Bob to George
-               //this case should also work since 3 + 253 <= NUM_POINTERS*BLOCK_SIZE
+    RSFS_fseek(fd, 3)
+    write(fd, newText, 253) <--- RSFS_print_inode_data_blocks() outputs 
+                                    some blank datalocks from Bob to George
+    
+    //this case should also work since 3 + 253 <= NUM_POINTERS*BLOCK_SIZE
 
-    Interestingly, second writing with RSFS_write() works perfectly fine upto the size of 256. As you can see in the concurrent test cases.
-###
+Interestingly, second writing with RSFS_write() works perfectly fine upto the size of 256. As you can see in the concurrent test cases.
 
 
 
 ### File def.h
 
-line:10 #include <semaphore.h>
-    Library addition for concurrent test cases
+Library addition for concurrent test cases
 
-line:39-46 struct inode{...}
-    int read_count - count the number of readers reading in critical section
-    sem_t rw_mutex - binary semaphore (lock) for both readers and writers
-    sem_t mutex - lock used by readers to protect the race condition, reaad_count
+    line:10 #include <semaphore.h>
 
-line:115-118
-    Added the declarationgs of helper functions
-    int RSFS_print_data_blocks();
-    int RSFS_print_inode_data_blocks();
-    int RSFS_print_OFT();
+    line:39-46 struct inode{...}
+        int read_count - count the number of readers reading in critical section
+        sem_t rw_mutex - binary semaphore (lock) for both readers and writers
+        sem_t mutex - lock used by readers to protect the race condition, reaad_count
+
+    line:115-118 Added the declarationgs of helper functions
+        int RSFS_print_data_blocks();
+        int RSFS_print_inode_data_blocks();
+        int RSFS_print_OFT();
 
 
 
 
 ### File: api.c 
 
-line: 128-129   RSFS_delete(char file_name)
-    I added deletion of data contents in data_blocks. Also the inode->block[i] is set to -1.
+Deletion of data contents in data_blocks. 
 
-line:196-235 RSFS_open(char file_name, int access_flag)
-    Checking the validity of access_flag: The flag should be either RD or RDWR. Otherwise return -1 to indicate the flag is invalid.
+    line: 128-129   RSFS_delete(char file_name)
+    Also the inode->block[i] is set to -1.
+    
+
+#### Open file function:
+
+    line:196-235 RSFS_open(char file_name, int access_flag)
+    
+Checks the validity of access_flag: The flag should be either RD or RDWR. Otherwise return -1 to indicate the flag is invalid.
     Surround with mutexes to ensure the safety for concurrency.
     First, search the root directory with the given name (int filename) to get the desired directory entry. This is achievd by calling search_dir(filename).
     If the file name is present, get the associated inode number.
     Note that each entry of the Open File Table corresponds to a file descriptor, i.e. fd. 
     Next, given the obtained inode number, set the necessary fields (fd, used, access_flag, inode_number, position) with given arguments.
-    Return the fd >= 0.
-    <<Concurrent Case Added>>
-    I used semaphore library to impelement read-write lock, read count, and mutex.
-    If the access flag is RDWR, the open is exclusive to a single RDWR thread, so sem_wait() to decreament semaphore value.
-    If the access flag is RDONLY, while incrementing the read count with mutex lock, it checks the read count so that the calling thread needs to wait util RDWR is done.
+    Return the fd $\geq$ 0.
+#### <ins> Concurrent Case for open() </ins>
+I used semaphore library to impelement read-write lock, read count, and mutex.
+If the access flag is RDWR, the open is exclusive to a single RDWR thread, so sem_wait() to decreament semaphore value. If the access flag is RDONLY, while incrementing the read count with mutex lock, it checks the read count so that the calling thread needs to wait util RDWR is done.
 
-line:241-335 RSFS_append(int fd, void *buf, int size)
-    Appends the given size of a buffer to the end of the file content.
+#### Append function:
+
+    line:241-335 RSFS_append(int fd, void *buf, int size)
+
+Appends the given size of a buffer to the end of the file content.
     Given the file descriptor fd, it obtains an open file entry from the open file table. It will acquire an inode associated with the fd.
     Given the file length of the current inode, it iterates from the last position upto the maximum number of direct pointers.
     The start index is given by the following computation:
